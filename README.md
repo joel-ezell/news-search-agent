@@ -81,3 +81,17 @@ The agent provides structured reports including:
 - Source Citations and Reliability Assessment
 
 All news results are filtered to the most recent 7 days and sorted by publish date to ensure current relevance.
+
+## Streamlit UI ✅
+
+A lightweight Streamlit application is included to run the Crew from a browser UI.
+
+Run it locally:
+
+```bash
+pip install -r requirements.txt
+pip install streamlit
+streamlit run streamlit_app.py
+```
+
+Make sure your `.env` includes `GROQ_API_KEY`, `GNEWS_API_KEY`, and `SERPER_API_KEY` before running the UI.

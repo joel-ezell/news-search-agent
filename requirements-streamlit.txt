@@ -1,0 +1,6 @@
+# Use this if you want a full set including the Streamlit UI
+# NOTE: Do not list `langchain` or `langchain-groq` explicitly to avoid dependency resolver conflicts.
+crewai==0.1.24
+requests
+python-dotenv==1.0.0
+streamlit>=1.25.0

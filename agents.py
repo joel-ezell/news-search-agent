@@ -1,17 +1,22 @@
-from crewai import Agent, LLM
+from crewai import Agent
+# Provide a compatibility layer: prefer `LLM` if available, otherwise fall back to ChatOpenAI
 from textwrap import dedent
 import os
 from dotenv import load_dotenv
 
-# Correctly import the tool classes
-from tools.search_news import SearchNews
-from tools.search_tools import SearchTools
-from tools.calculator_tools import CalculatorTools
+try:
+    from crewai import LLM as CrewLLM
+    def _make_llm(model, api_key, base_url):
+        return CrewLLM(provider="groq", model=model, api_key=api_key, base_url=base_url)
+except Exception:
+    from crewai.agent import ChatOpenAI
+    def _make_llm(model, api_key, base_url):
+        return ChatOpenAI(model=model, api_key=api_key, base_url=base_url)
 
-# Instantiate the tools to make them available to the agents
-search_news_tool = SearchNews()
-search_tool = SearchTools()
-calculator_tool = CalculatorTools()
+# Import tool instances (Tool objects) exported by the modules
+from tools.search_news import search_news_tool
+from tools.search_tools import search_tool
+from tools.calculator_tools import calculator_tool
 
 
 class NewsAgents:
@@ -24,14 +29,9 @@ class NewsAgents:
         load_dotenv()
         groq_api_key = os.getenv("GROQ_API_KEY")
 
-        # Configure CrewAI's native LLM provider to Groq to avoid OpenAI fallback
-        # This ensures all agent calls use Groq's API directly.
-        self.llm = LLM(
-            provider="groq",
-            model="groq/llama-3.3-70b-versatile",
-            api_key=groq_api_key,
-            base_url="https://api.groq.com/openai/v1",
-        )
+        # Configure LLM (use compatibility factory to choose the available client)
+        model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.llm = _make_llm(model_name, groq_api_key, "https://api.groq.com/openai/v1")
 
     def news_analyst(self):
         """
