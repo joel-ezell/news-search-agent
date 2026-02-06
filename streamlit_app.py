@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from crew import NewsResearchCrew
 import io
 import contextlib
+from requests.exceptions import Timeout
 
 load_dotenv()
 
@@ -32,35 +33,65 @@ if run:
         topic_list = [t.strip() for t in topics.split(",") if t.strip()]
         st.info(f"Running research for topics: {', '.join(topic_list)} — depth={search_depth}")
 
-        # Capture stdout (crew prints) so we can show logs in the UI
-        buf = io.StringIO()
-        with st.spinner("Running Crew — this may take a bit depending on LLM/tool calls..."):
-            with contextlib.redirect_stdout(buf):
-                crew = NewsResearchCrew(topic_list, search_depth)
-                try:
-                    result = crew.run()
-                except Exception as e:
-                    result = None
-                    err = e
-        logs = buf.getvalue()
+        max_attempts = 3
+        result = None
+        err = None
+        logs = ""
+        
+        for attempt in range(1, max_attempts + 1):
+            # Capture stdout (crew prints) so we can show logs in the UI
+            buf = io.StringIO()
+            
+            if attempt > 1:
+                st.info(f"⏱️ Attempt {attempt} of {max_attempts}...")
+            
+            with st.spinner(f"Running Crew (attempt {attempt}/{max_attempts}) — this may take a bit depending on LLM/tool calls..."):
+                with contextlib.redirect_stdout(buf):
+                    crew = NewsResearchCrew(topic_list, search_depth)
+                    try:
+                        result = crew.run()
+                        err = None
+                        logs = buf.getvalue()
+                        break  # Success! Exit retry loop
+                    except Timeout:
+                        result = None
+                        err = "Request timed out (30 second limit). "
+                        logs = buf.getvalue()
+                        if attempt < max_attempts:
+                            st.warning(f"⚠️ Timeout on attempt {attempt}. Retrying...")
+                    except Exception as e:
+                        result = None
+                        err = e
+                        logs = buf.getvalue()
+                        break  # Don't retry non-timeout errors
 
         if result:
             st.subheader("Research Report")
             # The result is plain text — show in a wrapping, read-only text area for better readability
             st.text_area("Research Report", value=result, height=400, disabled=True)
         else:
-            st.error("Crew run failed. See logs for details.")
-            st.exception(err)
+            error_msg = str(err) if err else "Unknown error occurred."
+            st.error(f"✗ Crew run failed: {error_msg}")
+            
+            if "timed out" in error_msg.lower():
+                st.warning("The request timed out after 3 attempts. This might be due to high server load or network issues.")
+            
+            if st.button("🔄 Retry Research"):
+                st.rerun()
+            
+            if logs:
+                st.exception(err)
 
-        with st.expander("Show Crew logs"):
-            if logs.strip():
-                # Use a wrapping text area for logs so long lines wrap and are scrollable
-                st.text_area("Crew logs", value=logs, height=300, disabled=True)
-            else:
-                st.write("No logs captured.")
+        if logs:
+            with st.expander("Show Crew logs"):
+                if logs.strip():
+                    # Use a wrapping text area for logs so long lines wrap and are scrollable
+                    st.text_area("Crew logs", value=logs, height=300, disabled=True)
+                else:
+                    st.write("No logs captured.")
 
-        st.success("Run complete ✅")
+        if result:
+            st.success("Run complete ✅")
 
 st.markdown("---")
-st.markdown("**Tip:** Make sure your `.env` contains `GROQ_API_KEY`, `GNEWS_API_KEY`, and `SERPER_API_KEY` as needed.")
 

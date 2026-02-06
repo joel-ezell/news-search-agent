@@ -6,16 +6,16 @@ from dotenv import load_dotenv
 
 try:
     from crewai import LLM as CrewLLM
-    def _make_llm(model, api_key, base_url):
-        return CrewLLM(provider="groq", model=model, api_key=api_key, base_url=base_url)
+    def _make_llm(model, api_key, base_url, timeout=30):
+        return CrewLLM(provider="groq", model=model, api_key=api_key, base_url=base_url, timeout=timeout)
 except Exception:
     from crewai.agent import ChatOpenAI
-    def _make_llm(model, api_key, base_url):
-        return ChatOpenAI(model=model, api_key=api_key, base_url=base_url)
+    def _make_llm(model, api_key, base_url, timeout=30):
+        return ChatOpenAI(model=model, api_key=api_key, base_url=base_url, timeout=timeout)
 
 # Import tool instances (Tool objects) exported by the modules
 from tools.search_news import search_news_tool
-from tools.search_tools import search_tool
+from tools.search_internet import search_internet_tool
 from tools.calculator_tools import calculator_tool
 
 
@@ -31,7 +31,7 @@ class NewsAgents:
 
         # Configure LLM (use compatibility factory to choose the available client)
         model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-        self.llm = _make_llm(model_name, groq_api_key, "https://api.groq.com/openai/v1")
+        self.llm = _make_llm(model_name, groq_api_key, "https://api.groq.com/openai/v1", timeout=30)
 
     def news_analyst(self):
         """
@@ -44,7 +44,7 @@ class NewsAgents:
             # Pass the instantiated tool methods to the agent
             tools=[
                 search_news_tool,
-                search_tool
+                search_internet_tool
             ],
             verbose=True,
             llm=self.llm,
@@ -63,7 +63,7 @@ class NewsAgents:
                         the reliability of news content before it's reported or analyzed."""
                        ),
             # Pass the instantiated tool method to the agent
-            tools=[search_tool, search_news_tool],
+            tools=[search_internet_tool, search_news_tool],
             verbose=True,
             llm=self.llm,
         )
@@ -81,7 +81,7 @@ class NewsAgents:
                                 Monitor trending topics, identify viral news stories, track story development over time,
                                 and provide insights into what content is gaining traction and why."""),
             # Pass the instantiated tool method to the agent
-            tools=[search_news_tool, search_tool],
+            tools=[search_news_tool, search_internet_tool],
             verbose=True,
             llm=self.llm,
         )
@@ -99,7 +99,7 @@ class NewsAgents:
                                 Conduct thorough research on specified topics, gather information from multiple reliable sources,
                                 and provide comprehensive, well-structured reports on current events and news topics."""),
             # Pass the instantiated tool method to the agent
-            tools=[search_news_tool, search_tool],
+            tools=[search_news_tool, search_internet_tool],
             verbose=True,
             llm=self.llm,
         )

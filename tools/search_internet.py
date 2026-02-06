@@ -8,7 +8,9 @@ from pydantic.v1 import BaseModel, Field
 
 # Load environment variables
 load_dotenv()
-SERPER_API_KEY = os.getenv("SERPER_API_KEY", "b746d74bdeffe79b0f5e16792c6ee3bb4a12b5f9f4293f49c91b6481c913df60")
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+if not SERPER_API_KEY:
+    raise ValueError("SERPER_API_KEY environment variable not set. Please add it to your .env file.")
 
 class SearchInput(BaseModel):
     """Input schema for search tool."""
@@ -17,7 +19,7 @@ class SearchInput(BaseModel):
 
 def _search_internet(query: str) -> str:
     """Execute the internet search and return relevant results."""
-    print(f"🌐 SearchTools called with query: '{query}'")
+    print(f"🌐 SearchInternet called with query: '{query}'")
     top_result_to_return = 4
     url = "https://google.serper.dev/search"
     payload = json.dumps({"q": query})
@@ -31,6 +33,16 @@ def _search_internet(query: str) -> str:
     except Exception as e:
         return f"Error making search request: {e}"
 
+    # Check HTTP status code
+    if response.status_code != 200:
+        print(f"Search API returned status code {response.status_code}")
+        if response.status_code == 403:
+            return "Error: Access forbidden (403). Please verify your Serper API key is valid and has available credits."
+        elif response.status_code == 401:
+            return "Error: Unauthorized (401). Your Serper API key is invalid."
+        else:
+            return f"Error: Search API returned status code {response.status_code}"
+
     try:
         json_resp = response.json()
     except json.JSONDecodeError:
@@ -38,7 +50,7 @@ def _search_internet(query: str) -> str:
 
     # Check if the response was successful and contains the expected data
     if 'organic' not in json_resp:
-        return "Error: Could not retrieve search results. Please check your Serper API key."
+        return "Error: Could not retrieve search results. Response may be incomplete."
 
     results = json_resp['organic']
     print(f"Found {len(results)} search results")
