@@ -6,12 +6,11 @@ if __name__ == "__main__":
     print('-------------------------------')
 
     topics = input(dedent("What news topics would you like to research? (separate multiple topics with commas)\n"))
-    search_depth = input(dedent("What depth of research would you prefer? (basic/comprehensive/detailed) [default: comprehensive]\n")) or "comprehensive"
     
     # Convert topics string to list
     topic_list = [topic.strip() for topic in topics.split(',')]
 
-    news_crew = NewsResearchCrew(topic_list, search_depth)
+    news_crew = NewsResearchCrew(topic_list)
     result = news_crew.run()
 
     print("\n\n########################")

@@ -103,3 +103,22 @@ class NewsAgents:
             verbose=True,
             llm=self.llm,
         )
+
+    def general_inquiry_agent(self):
+        """
+        Sets up a general inquiry agent to handle non-news questions and provide information on various topics.
+        """
+        return Agent(
+            role="General Inquiry Specialist",
+            backstory=dedent(f"""
+                                    A knowledgeable assistant with broad expertise across multiple domains including technology, 
+                                    science, history, culture, and general knowledge. Skilled at finding accurate information 
+                                    and providing clear, helpful explanations."""),
+            goal=dedent(f"""
+                                Answer general questions and inquiries with accurate, well-researched information from multiple sources.
+                                Provide clear explanations and helpful insights on a wide range of topics."""),
+            # Pass the instantiated tool method to the agent
+            tools=[search_internet_tool],
+            verbose=True,
+            llm=self.llm,
+        )

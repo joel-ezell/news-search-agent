@@ -119,7 +119,7 @@ class NewsTasks:
                         - Regional interest patterns
                         - Timeline of development"""))
 
-    def research_news(self, agent, topics, search_depth):
+    def research_news(self, agent, topics):
         """
             Creates a task for the agent to research and gather news on specified topics.
 
@@ -133,7 +133,6 @@ class NewsTasks:
             Parameters:
             - agent (Agent): The AI agent responsible for news research
             - topics (list): List of topics to research
-            - search_depth (str): Depth of research ("basic", "comprehensive", or "detailed")
 
             Returns:
             - Task: A CrewAI task for comprehensive news research
@@ -159,7 +158,6 @@ class NewsTasks:
 
                             **Research Parameters**:
                             - Topics: {topics}
-                            - Search Depth: {search_depth}
                             - Focus: Current events and recent developments"""),
             agent=agent,
             expected_output=dedent("""A comprehensive report covering:
@@ -167,5 +165,49 @@ class NewsTasks:
                 - Topic-by-topic analysis
                 - Event timeline
                 - Trend implications
+                - Source citations"""),
+        )
+
+    def general_inquiry(self, agent, query):
+        """
+            Creates a task for the agent to answer a general inquiry question.
+
+            This task involves researching and answering questions on various topics
+            that are not specifically news-related. The agent will:
+            - Search for relevant information on the topic
+            - Synthesize information from multiple sources
+            - Provide a clear, comprehensive answer
+            - Include context and relevant details
+
+            Parameters:
+            - agent (Agent): The AI agent responsible for answering the inquiry
+            - query (str): The question or inquiry to answer
+
+            Returns:
+            - Task: A CrewAI task for general inquiry answering
+        """
+        return Task(
+            description=dedent(f"""**Task**: Answer General Inquiry Question
+                            **Objective**: Research and provide a comprehensive answer to the following question:
+                            
+                            {query}
+
+                            **Requirements**:
+                            - Search for accurate, relevant information
+                            - Synthesize information from multiple reliable sources
+                            - Provide clear, well-structured explanation
+                            - Include context, examples, and relevant details
+                            - Cite sources and maintain objectivity
+
+                            **Output Format**:
+                            - Direct answer to the question
+                            - Supporting details and explanation
+                            - Relevant context and examples
+                            - Source citations"""),
+            agent=agent,
+            expected_output=dedent("""A comprehensive answer including:
+                - Clear response to the inquiry
+                - Supporting details and explanation
+                - Relevant context and examples
                 - Source citations"""),
         )

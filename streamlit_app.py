@@ -1,74 +1,115 @@
-"""Streamlit UI for the News Research Crew
+"""Streamlit UI for the Research & Inquiry Crew
 
 Usage:
     pip install -r requirements.txt
     streamlit run streamlit_app.py
 
-This app runs the `NewsResearchCrew` from `crew.py`, captures its stdout
-(for debugging) and shows the final research report.
+This app intelligently routes queries to either news research or general inquiry
+based on the content of the user's input.
 """
 
 import streamlit as st
 from dotenv import load_dotenv
-from crew import NewsResearchCrew
-import io
-import contextlib
+from crew import NewsResearchCrew, GeneralInquiryCrew, QueryRouter
 from requests.exceptions import Timeout
 
 load_dotenv()
 
-st.set_page_config(page_title="News Research Crew", layout="wide")
-st.title("📰 News Research Crew")
-st.markdown("Use the Crew to research news topics. This UI calls your local Crew runner and displays logs and the final report.")
+st.set_page_config(page_title="Research & Inquiry Crew", layout="wide")
+st.title("🔍 Research & Inquiry Crew")
+st.markdown("Ask about news topics or any general question - the crew will intelligently route your query and provide comprehensive answers.")
 
-with st.form(key="research_form"):
-    topics = st.text_input("Topics (comma-separated)", value="", placeholder="Enter your research topics here")
-    search_depth = st.selectbox("Search depth", options=["basic", "comprehensive", "detailed"], index=1)
-    run = st.form_submit_button("Run Research")
+# Quick topic buttons for news
+st.subheader("Quick News Topics")
+cols = st.columns(4)
 
-if run:
-    if not topics.strip():
-        st.error("Please enter at least one topic.")
+topic_buttons = [
+    ("🏆 Sports", "Sports"),
+    ("💻 Technology", "Technology"),
+    ("💰 Finance", "Finance"),
+    ("🌍 World News", "World News")
+]
+
+for col, (button_label, topic) in zip(cols, topic_buttons):
+    with col:
+        if st.button(button_label, key=f"btn_{topic}", use_container_width=True):
+            st.session_state.run_query = True
+            st.session_state.query_input = topic
+            st.session_state.is_news = True
+
+# Custom query input
+st.subheader("Custom Query")
+query_input = st.text_input(
+    "Enter your question or topic", 
+    value="", 
+    placeholder="Ask about current news, or any general question...",
+    key="custom_query"
+)
+
+# Submit on Enter key or button click
+if query_input:
+    st.session_state.run_query = True
+    st.session_state.query_input = query_input
+    st.session_state.is_news = None  # Will be determined by router
+else:
+    if st.button("Search", key="search_btn"):
+        if query_input:
+            st.session_state.run_query = True
+            st.session_state.query_input = query_input
+            st.session_state.is_news = None  # Will be determined by router
+
+# Execute query if triggered
+if st.session_state.get("run_query", False):
+    query = st.session_state.get("query_input", "")
+    
+    if not query.strip():
+        st.error("Please enter a question or select a topic.")
+        st.session_state.run_query = False
     else:
-        topic_list = [t.strip() for t in topics.split(",") if t.strip()]
-        st.info(f"Running research for topics: {', '.join(topic_list)} — depth={search_depth}")
+        # Determine query type if not already set
+        if st.session_state.get("is_news") is None:
+            router = QueryRouter()
+            query_type = router.route_query(query)
+            st.session_state.is_news = (query_type == 'news')
+        
+        is_news = st.session_state.get("is_news", True)
+        query_type_label = "news research" if is_news else "general inquiry"
+        st.info(f"Running {query_type_label} for: {query}")
 
         max_attempts = 3
         result = None
         err = None
-        logs = ""
         
         for attempt in range(1, max_attempts + 1):
-            # Capture stdout (crew prints) so we can show logs in the UI
-            buf = io.StringIO()
-            
             if attempt > 1:
                 st.info(f"⏱️ Attempt {attempt} of {max_attempts}...")
             
             with st.spinner(f"Running Crew (attempt {attempt}/{max_attempts}) — this may take a bit depending on LLM/tool calls..."):
-                with contextlib.redirect_stdout(buf):
-                    crew = NewsResearchCrew(topic_list, search_depth)
-                    try:
-                        result = crew.run()
-                        err = None
-                        logs = buf.getvalue()
-                        break  # Success! Exit retry loop
-                    except Timeout:
-                        result = None
-                        err = "Request timed out (30 second limit). "
-                        logs = buf.getvalue()
-                        if attempt < max_attempts:
-                            st.warning(f"⚠️ Timeout on attempt {attempt}. Retrying...")
-                    except Exception as e:
-                        result = None
-                        err = e
-                        logs = buf.getvalue()
-                        break  # Don't retry non-timeout errors
+                try:
+                    if is_news:
+                        # For news queries, treat as a list of topics
+                        topics = [query] if isinstance(query, str) else query
+                        crew = NewsResearchCrew(topics)
+                    else:
+                        crew = GeneralInquiryCrew(query)
+                    
+                    result = crew.run()
+                    err = None
+                    break  # Success! Exit retry loop
+                except Timeout:
+                    result = None
+                    err = "Request timed out (30 second limit). "
+                    if attempt < max_attempts:
+                        st.warning(f"⚠️ Timeout on attempt {attempt}. Retrying...")
+                except Exception as e:
+                    result = None
+                    err = e
+                    print(f"Exception occurred: {type(e).__name__}: {str(e)}")
+                    break  # Don't retry non-timeout errors
 
         if result:
-            st.subheader("Research Report")
-            # The result is plain text — show in a wrapping, read-only text area for better readability
-            st.text_area("Research Report", value=result, height=400, disabled=True)
+            st.subheader("Result")
+            st.text_area("Result", value=result, height=400, disabled=True)
         else:
             error_msg = str(err) if err else "Unknown error occurred."
             st.error(f"✗ Crew run failed: {error_msg}")
@@ -76,22 +117,15 @@ if run:
             if "timed out" in error_msg.lower():
                 st.warning("The request timed out after 3 attempts. This might be due to high server load or network issues.")
             
-            if st.button("🔄 Retry Research"):
+            if st.button("🔄 Retry"):
                 st.rerun()
             
-            if logs:
+            if err:
                 st.exception(err)
-
-        if logs:
-            with st.expander("Show Crew logs"):
-                if logs.strip():
-                    # Use a wrapping text area for logs so long lines wrap and are scrollable
-                    st.text_area("Crew logs", value=logs, height=300, disabled=True)
-                else:
-                    st.write("No logs captured.")
 
         if result:
             st.success("Run complete ✅")
+        
+        st.session_state.run_query = False
 
 st.markdown("---")
-
